@@ -1,6 +1,7 @@
 package encryption
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -8,8 +9,8 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"io"
+	"log"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -24,6 +25,11 @@ type Credentials struct {
 	Password []byte
 	Key      string
 }
+
+var (
+	buf    bytes.Buffer
+	logger = log.New(&buf, "logger: ", log.Lshortfile+log.Ldate+log.Ltime)
+)
 
 /*
 HashAndSalt ...
@@ -57,13 +63,14 @@ func DecryptString(k string, v string) ([]byte, error) {
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	//	fmt.Println("Lengh of cipherText is: ", len(cipherText))
 	//	fmt.Println("aes.BlockSize is: ", aes.BlockSize)
 
 	if len(cipherText) < aes.BlockSize {
-		panic("cipherText too short")
+		//panic("cipherText too short")
+		return nil, errors.New("cipherText is too short")
 	}
 	iv := cipherText[:aes.BlockSize]
 	cipherText = cipherText[aes.BlockSize:]
@@ -86,7 +93,7 @@ func EncryptString(k string, v string) ([]byte, error) {
 	plainText := []byte(v)
 	block, err := aes.NewCipher(newKeyString)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	cipherText := make([]byte, aes.BlockSize+len(plainText))
@@ -111,7 +118,7 @@ func (c Credentials) Sha256() []byte {
 
 	hash.Write(c.Password)
 	bs := hash.Sum(nil)
-	fmt.Printf("Sha256 :%x\n", bs)
+	//fmt.Printf("Sha256 :%x\n", bs)
 
 	return bs
 }
@@ -128,7 +135,7 @@ func hashTo32Bytes(input string) (string, error) {
 	hasher.Write([]byte(input))
 	stringToSHA256 := base64.URLEncoding.EncodeToString(hasher.Sum(nil))
 
-	fmt.Println("Encrypt - Orig: ", stringToSHA256)
+	//fmt.Println("Encrypt - Orig: ", stringToSHA256)
 	return stringToSHA256[:32], nil
 
 }
@@ -222,6 +229,5 @@ func Decrypt(data []byte, passphrase string) []byte {
 
 // Hello function
 func Hello() string {
-	fmt.Println("Call to Neo4j driver")
-	return "Hello, from encryption module"
+	return "Hello, from encryption package"
 }
