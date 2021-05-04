@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -28,45 +29,38 @@ type Credentials struct {
 HashAndSalt ...
 */
 func (c Credentials) HashAndSalt() (string, error) {
-
 	hash, err := bcrypt.GenerateFromPassword(c.Password, bcrypt.MinCost)
 	if err != nil {
 		return "", err
 	}
-
 	return string(hash), nil
-
 }
 
 /*
 CompareHash ...
 */
 func CompareHash(orig string, pass []byte) (bool, error) {
-
 	byteHash := []byte(orig)
 	err := bcrypt.CompareHashAndPassword(byteHash, pass)
 	if err != nil {
 		return false, err
 	}
-
 	return true, nil
-
 }
 
 /*
 DecryptString ...
 */
-func (c Credentials) DecryptBytes() ([]byte, error) {
+func DecryptString(k string, v string) ([]byte, error) {
+	key, _ := hex.DecodeString(k)
+	cipherText, _ := hex.DecodeString(v)
 
-	newKeyString, err := hashTo32Bytes(c.Key)
-	cipherText, _ := base64.URLEncoding.DecodeString(string(c.Password))
-
-	block, err := aes.NewCipher([]byte(newKeyString))
+	block, err := aes.NewCipher(key)
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("Lengh of cipherText is: ", len(cipherText))
-	fmt.Println("aes.BlockSize is: ", aes.BlockSize)
+	//	fmt.Println("Lengh of cipherText is: ", len(cipherText))
+	//	fmt.Println("aes.BlockSize is: ", aes.BlockSize)
 
 	if len(cipherText) < aes.BlockSize {
 		panic("cipherText too short")
@@ -76,47 +70,43 @@ func (c Credentials) DecryptBytes() ([]byte, error) {
 	stream := cipher.NewCFBDecrypter(block, iv)
 	stream.XORKeyStream(cipherText, cipherText)
 
-	//return string(cipherText), nil
 	return cipherText, nil
 }
 
 /*
 EncryptString ...
 */
-func (c Credentials) EncryptBytes() ([]byte, error) {
-
-	newKeyString, err := hashTo32Bytes(c.Key)
+func EncryptString(k string, v string) ([]byte, error) {
+	//newKeyString, err := hashTo32Bytes(k)
+	newKeyString, err := hex.DecodeString(k)
 	if err != nil {
 		return nil, err
 	}
 
-	key := []byte(newKeyString)
-	value := c.Password
-	block, err := aes.NewCipher(key)
+	plainText := []byte(v)
+	block, err := aes.NewCipher(newKeyString)
 	if err != nil {
 		panic(err)
 	}
 
-	cipherText := make([]byte, aes.BlockSize+len(value))
+	cipherText := make([]byte, aes.BlockSize+len(plainText))
 	iv := cipherText[:aes.BlockSize]
 	if _, err = io.ReadFull(rand.Reader, iv); err != nil {
 		return nil, err
 	}
 
 	cfb := cipher.NewCFBEncrypter(block, iv)
-	cfb.XORKeyStream(cipherText[aes.BlockSize:], value)
+	cfb.XORKeyStream(cipherText[aes.BlockSize:], plainText)
 
-	fmt.Println("Password is :", base64.URLEncoding.EncodeToString(cipherText))
-	//return base64.URLEncoding.EncodeToString(cipherText), nil
+	//fmt.Printf("%x\n", cipherText)
 	return cipherText, nil
 
 }
 
 /*
-Sha1 ...
+Sha256 ...
 */
 func (c Credentials) Sha256() []byte {
-
 	hash := sha256.New()
 
 	hash.Write(c.Password)
@@ -130,7 +120,6 @@ func (c Credentials) Sha256() []byte {
 hashTo32Bytes ...
 */
 func hashTo32Bytes(input string) (string, error) {
-
 	if len(input) == 0 {
 		return "", errors.New("No input")
 	}
